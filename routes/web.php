@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\KasController;
 use App\Http\Controllers\SuratController;
 use App\Http\Controllers\VerifikasiController;
 use Illuminate\Support\Facades\Route;
@@ -26,5 +27,14 @@ Route::prefix('api')->group(function () {
         Route::post('surat/perbaikan', [SuratController::class, 'perbaikan']);
         Route::get('surat/{id}/pdf', [SuratController::class, 'pdf'])->whereNumber('id');
         Route::get('dokumen/{id}', [SuratController::class, 'dokumen'])->whereNumber('id');
+
+        // Kas Warga (khusus pengurus RT).
+        Route::get('kas', [KasController::class, 'index']);
+        Route::post('kas/warga', [KasController::class, 'simpanWarga']);
+        Route::post('kas/warga/hapus', [KasController::class, 'hapusWarga']);
+        Route::post('kas/iuran', [KasController::class, 'simpanIuran']);
+        Route::post('kas/iuran/hapus', [KasController::class, 'hapusIuran']);
+        Route::post('kas/pengeluaran', [KasController::class, 'simpanPengeluaran']);
+        Route::post('kas/pengeluaran/hapus', [KasController::class, 'hapusPengeluaran']);
     });
 });

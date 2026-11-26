@@ -36,46 +36,12 @@ const esc = (s) =>
   );
 const brand = `<div class="logo"><i>${I('home')}</i><div><b>SaWarga <em>24</em></b><small>Quanta 2 Kuningan • RT 24 / RW 03</small></div></div>`;
 const S = {
-  kasAwal: 3720000,
-  kasUpd: '18 Mei 2025',
-  kasTab: 'daftar',
-  rekapBase: [
-    { b: '2025-01', in: 3950000, out: 2975000 },
-    { b: '2025-02', in: 4100000, out: 1620000 },
-    { b: '2025-03', in: 3850000, out: 2125000 },
-    { b: '2025-04', in: 4200000, out: 1850000 },
-  ],
-  kas: [
-    {
-      tgl: '2025-05-16',
-      jenis: 'keluar',
-      ket: 'Konsumsi kerja bakti',
-      kat: 'Kegiatan Warga',
-      nom: 150000,
-    },
-    {
-      tgl: '2025-05-12',
-      jenis: 'keluar',
-      ket: 'Perbaikan lampu jalan Blok C',
-      kat: 'Fasilitas',
-      nom: 305000,
-    },
-    { tgl: '2025-05-10', jenis: 'masuk', ket: 'Donasi kerja bakti', kat: 'Sumbangan', nom: 250000 },
-    {
-      tgl: '2025-05-05',
-      jenis: 'keluar',
-      ket: 'Honor petugas kebersihan',
-      kat: 'Kebersihan',
-      nom: 600000,
-    },
-    {
-      tgl: '2025-05-01',
-      jenis: 'masuk',
-      ket: 'Iuran warga bulan Mei',
-      kat: 'Iuran Bulanan',
-      nom: 2100000,
-    },
-  ],
+  // Kas Warga: data dari api/kas (lihat loadKas).
+  kasTab: 'rekap',
+  kasTh: new Date().getFullYear(),
+  kasBl: 0,
+  kasKat: '',
+  K: null,
   seq: 0,
   user: null,
   view: 'dash',
@@ -483,6 +449,7 @@ function app() {
     }
     S.user = null;
     S.letters = [];
+    S.K = null;
     login();
   };
   $('#tg').onclick = theme;
@@ -944,124 +911,480 @@ const fmtD = (iso) => {
 };
 const isoToday = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-const KAT = ['Iuran Bulanan', 'Sumbangan', 'Fasilitas', 'Kebersihan', 'Kegiatan Warga', 'Lainnya'];
-function kasMonths() {
-  const m = {};
-  S.rekapBase.forEach((r) => (m[r.b] = { in: r.in, out: r.out, nIn: 0, nOut: 0 }));
-  S.kas.forEach((t) => {
-    const x = (m[t.tgl.slice(0, 7)] ||= { in: 0, out: 0, nIn: 0, nOut: 0 });
-    if (t.jenis === 'masuk') {
-      x.in += t.nom;
-      x.nIn++;
-    } else {
-      x.out += t.nom;
-      x.nOut++;
-    }
-  });
-  return Object.keys(m)
-    .sort()
-    .map((k) => ({ k, ...m[k], net: m[k].in - m[k].out }));
+// ---------- Kas Warga (pengurus RT) ----------
+// Tab mengikuti sheet di file "Laporan Keuangan RT": Rekap, Input Iuran, Pelaporan Iuran,
+// Pengeluaran, Data Warga, Petunjuk. Ceklis hanya dari Input Iuran. Data dari api/kas (KasController).
+const BL = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const KTAB = [
+  ['rekap', 'Rekap'],
+  ['iuran', 'Input Iuran'],
+  ['lapor', 'Pelaporan Iuran'],
+  ['keluar', 'Pengeluaran'],
+  ['warga', 'Data Warga'],
+  ['bantu', 'Petunjuk'],
+];
+const tglS = (iso) => {
+  const [y, m, d] = iso.split('-');
+  return d + ' ' + BL[+m - 1] + ' ' + y;
+};
+const rpS = (n) => (n < 0 ? '− ' : '') + rp(n);
+// [[2026,10],[2026,11],[2026,12],[2027,1]] -> "Okt 2026 – Jan 2027"
+function fmtBulan(list) {
+  const k = list.map(([t, m]) => t * 12 + m - 1).sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < k.length; i++) {
+    let j = i;
+    while (j + 1 < k.length && k[j + 1] === k[j] + 1) j++;
+    const a = [Math.floor(k[i] / 12), k[i] % 12],
+      b = [Math.floor(k[j] / 12), k[j] % 12];
+    out.push(
+      i === j
+        ? BL[a[1]] + ' ' + a[0]
+        : a[0] === b[0]
+          ? BL[a[1]] + ' – ' + BL[b[1]] + ' ' + a[0]
+          : BL[a[1]] + ' ' + a[0] + ' – ' + BL[b[1]] + ' ' + b[0],
+    );
+    i = j;
+  }
+  return out.join(', ');
 }
-const saldoNow = () => S.kasAwal + kasMonths().reduce((a, x) => a + x.net, 0);
+async function loadKas() {
+  S.kasLoad = true;
+  try {
+    S.K = await api('api/kas?tahun=' + S.kasTh);
+    S.kasTh = S.K.tahun;
+  } catch (e) {
+    S.K = { gagal: e.message };
+  }
+  S.kasLoad = false;
+  if (S.view === 'kas') app();
+}
+const kasReload = () => {
+  S.K = null;
+  loadKas();
+};
+const wargaBy = (id) => S.K.warga.find((w) => w.id === id);
+// Nominal yang sudah dibayar rumah w untuk bulan m (tahun laporan); 0 = belum.
+const lunas = (w, m) => S.K.bayar[w.id]?.[m] || 0;
+const cari = (ph) =>
+  `<div class="kq">${I('search')}<input type="search" id="kq" placeholder="${ph}" aria-label="${ph}"></div>`;
+const pilihBulan = () =>
+  `<select id="kbl" aria-label="Filter bulan"><option value="0">Semua bulan</option>${BL.map((b, i) => `<option value="${i + 1}"${S.kasBl === i + 1 ? ' selected' : ''}>${MON[i]}</option>`).join('')}</select>`;
+const aksi = (t, id) =>
+  `<td class="ka">${t === 'iuran' ? '' : `<button class="ib" data-ke="${t}:${id}" title="Ubah" aria-label="Ubah">${I('pen')}</button>`}<button class="ib r" data-kh="${t}:${id}" title="Hapus" aria-label="Hapus">${I('trash')}</button></td>`;
+
 function kasPage() {
-  const L = kasMonths(),
-    cur = L[L.length - 1],
-    awal = S.kasAwal + L.slice(0, -1).reduce((a, x) => a + x.net, 0),
-    akhir = awal + cur.net,
-    mn = MON[+cur.k.slice(5) - 1],
-    pos = cur.net >= 0,
-    sg = (n) => (n >= 0 ? '+ ' : '− ') + rp(n);
+  if (!S.K || S.K.tahun !== S.kasTh) {
+    if (!S.kasLoad && !S.K?.gagal) loadKas();
+    const g = S.K?.gagal;
+    return `<div class="wrap"><div class="hd"><div><h1>Kas Warga</h1><p>Laporan keuangan RT: iuran warga, pengeluaran, dan saldo kas.</p></div></div><div class="card"><p class="sub">${g ? esc(g) + ' <button class="lk" id="kasRetry">Coba lagi</button>' : 'Memuat data kas…'}</p></div></div>`;
+  }
+  const K = S.K,
+    th = K.tahun,
+    masuk = K.rekap.reduce((a, r) => a + r.masuk, 0),
+    keluar = K.rekap.reduce((a, r) => a + r.keluar, 0);
   const card = (cls, t, v, sub, ic, ico) =>
     `<div class="card stat kc ${cls}"><div><span>${t}</span><strong>${v}</strong><small>${sub}</small></div><div class="ic ${ico}">${I(ic)}</div></div>`;
-  const tab = (k, t) =>
-    `<button class="tb ${S.kasTab === k ? 'on' : ''}" data-kt="${k}">${t}</button>`;
-  const daftar = [...S.kas].sort((a, b) => b.tgl.localeCompare(a.tgl));
-  const body =
-    S.kasTab === 'daftar'
-      ? `<div class="card"><h3 style="margin:0">Daftar Transaksi</h3><p class="sub">${daftar.length} transaksi tercatat</p><div class="tw"><table><thead><tr><th>TANGGAL</th><th>KETERANGAN</th><th>KATEGORI</th><th>JENIS</th><th>NOMINAL</th></tr></thead><tbody>${daftar.map((t) => `<tr><td>${fmtD(t.tgl)}</td><td>${esc(t.ket)}</td><td>${t.kat}</td><td><span class="tag ${t.jenis === 'masuk' ? 'g' : 'r'}">${t.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}</span></td><td class="${t.jenis === 'masuk' ? 'up' : 'dn'}">${t.jenis === 'masuk' ? '+' : '−'} ${rp(t.nom)}</td></tr>`).join('')}</tbody></table></div></div>`
-      : `<div class="dg"><div class="card"><h3 style="margin:0">Rekap Kas Bulanan</h3><p class="sub">Ringkasan pemasukan dan pengeluaran enam bulan terakhir</p><div class="tw"><table><thead><tr><th>BULAN</th><th>PEMASUKAN</th><th>PENGELUARAN</th><th>SELISIH</th></tr></thead><tbody>${[
-          ...L,
-        ]
-          .reverse()
-          .slice(0, 6)
-          .map(
-            (x) =>
-              `<tr><td><b>${bln(x.k)}</b></td><td class="up">${rp(x.in)}</td><td class="dn">${rp(x.out)}</td><td><b>${sg(x.net)}</b></td></tr>`,
-          )
-          .join('')}</tbody></table></div></div>
- <div class="card"><small class="cap">RINGKASAN ${bln(cur.k).toUpperCase()}</small><h3 class="h3" style="margin:6px 0 16px">Arus kas bulan ini ${pos ? 'positif' : 'negatif'}</h3><div class="sur ${pos ? '' : 'neg'}"><small>${pos ? 'Surplus' : 'Defisit'}</small><strong>${sg(cur.net)}</strong></div><div class="sr"><span>Saldo awal</span><b>${rp(awal)}</b></div><div class="sr"><span>Saldo akhir</span><b>${rp(akhir)}</b></div></div></div>`;
-  return `<div class="wrap"><div class="hd"><div><h1>Kas Warga</h1><p>Catat pemasukan, pengeluaran, dan pantau saldo kas RT secara transparan.</p></div><div><button class="btn p" id="kasAdd">${I('plus')}Tambah Transaksi</button></div></div>
- <div class="grid3">${card('bl', 'Saldo Kas Saat Ini', rp(akhir), 'Diperbarui ' + S.kasUpd, 'wallet', '')}${card('g', 'Pemasukan ' + mn, rp(cur.in), cur.nIn + ' transaksi masuk', 'arrup', 'g')}${card('r', 'Pengeluaran ' + mn, rp(cur.out), cur.nOut + ' transaksi keluar', 'arrdn', 'r')}</div>
- <div class="tabs2">${tab('daftar', 'Daftar Transaksi')}${tab('rekap', 'Rekap Bulanan')}<button class="lk2 dlb" id="kasDl">${I('dl')}Unduh Rekap</button></div>${body}</div>`;
+  const tombol = {
+    iuran: `<button class="btn p" id="kasAdd">${I('plus')}Catat Iuran</button>`,
+    keluar: `<button class="btn p" id="kasAdd">${I('plus')}Tambah Pengeluaran</button>`,
+    warga: `<button class="btn p" id="kasAdd">${I('plus')}Tambah Rumah</button>`,
+  }[S.kasTab] || '';
+  const body = {
+    rekap: kRekap,
+    iuran: kIuran,
+    lapor: kLapor,
+    keluar: kKeluar,
+    warga: kWarga,
+    bantu: kBantu,
+  }[S.kasTab]();
+  return `<div class="wrap"><div class="hd"><div><h1>Kas Warga</h1><p>Laporan keuangan RT: iuran warga, pengeluaran, dan saldo kas.</p></div><div class="kh2"><label class="kth">Tahun laporan<select id="kth">${K.tahun_list.map((t) => `<option${t === th ? ' selected' : ''}>${t}</option>`).join('')}</select></label>${tombol}</div></div>
+ <div class="grid3">${card('bl', 'Saldo Kas Saat Ini', rpS(K.saldo_total), 'Total pemasukan dikurangi pengeluaran', 'wallet', '')}${card('g', 'Pemasukan ' + th, rp(masuk), 'Dari Input Iuran', 'arrup', 'g')}${card('r', 'Pengeluaran ' + th, rp(keluar), 'Dari sheet Pengeluaran', 'arrdn', 'r')}</div>
+ <div class="tabs2 ktabs" role="tablist">${KTAB.map(([k, t]) => `<button class="tb ${S.kasTab === k ? 'on' : ''}" data-kt="${k}" role="tab" aria-selected="${S.kasTab === k}">${t}</button>`).join('')}</div>${body}</div>`;
 }
-function unduhRekap() {
-  const rows = [['Bulan', 'Pemasukan', 'Pengeluaran', 'Selisih']].concat(
-    [...kasMonths()].reverse().map((x) => [bln(x.k), x.in, x.out, x.net]),
+
+function kRekap() {
+  const K = S.K;
+  let saldo = K.saldo_awal;
+  const rows = K.rekap.map((r) => {
+    const net = r.masuk - r.keluar;
+    saldo += net;
+    return `<tr><td><b>${MON[r.bulan - 1]}</b></td><td class="nr up">${rp(r.masuk)}</td><td class="nr dn">${rp(r.keluar)}</td><td class="nr ${net < 0 ? 'dn' : ''}">${rpS(net)}</td><td class="nr"><b>${rpS(saldo)}</b></td></tr>`;
+  });
+  const mi = K.rekap.reduce((a, r) => a + r.masuk, 0),
+    mo = K.rekap.reduce((a, r) => a + r.keluar, 0);
+  return `<div class="card"><div class="ch"><div><h3 style="margin:0">Rekap Keuangan RT ${K.tahun}</h3><p class="sub">Pemasukan, pengeluaran, selisih, dan saldo kumulatif per bulan.</p></div><button class="lk2" id="kasCsv">${I('dl')}Unduh CSV</button></div>
+ <div class="tw"><table class="kt"><thead><tr><th>BULAN</th><th class="nr">PEMASUKAN IURAN</th><th class="nr">PENGELUARAN</th><th class="nr">SELISIH BULANAN</th><th class="nr">SALDO KUMULATIF</th></tr></thead><tbody>
+ ${K.saldo_awal ? `<tr class="sa"><td colspan="4">Saldo awal (sisa kas sebelum ${K.tahun})</td><td class="nr"><b>${rpS(K.saldo_awal)}</b></td></tr>` : ''}${rows.join('')}</tbody>
+ <tfoot><tr><td>TOTAL TAHUN</td><td class="nr up">${rp(mi)}</td><td class="nr dn">${rp(mo)}</td><td class="nr">${rpS(mi - mo)}</td><td class="nr">${rpS(saldo)}</td></tr></tfoot></table></div></div>`;
+}
+
+function kIuran() {
+  const L = S.K.iuran.filter((x) => !S.kasBl || +x.tanggal.slice(5, 7) === S.kasBl),
+    tot = L.reduce((a, x) => a + x.total, 0);
+  return `<div class="card"><div class="ch"><div><h3 style="margin:0">Input Pembayaran Iuran</h3><p class="sub">${L.length} pembayaran tercatat di ${S.kasBl ? MON[S.kasBl - 1] + ' ' : ''}${S.K.tahun}. Setiap pembayaran otomatis memberi ceklis di Pelaporan Iuran.</p></div><button class="lk2" id="kasCsv">${I('dl')}Unduh CSV</button></div>
+ <div class="kbar">${cari('Cari rumah, nama, atau catatan')}${pilihBulan()}</div>
+ <div class="tw"><table class="kt"><thead><tr><th>TANGGAL</th><th>BLOK / NO. RUMAH</th><th>NAMA WARGA</th><th>BULAN DIBAYAR</th><th class="nr">TOTAL BAYAR</th><th>METODE</th><th>CATATAN</th><th></th></tr></thead><tbody>
+ ${L.map((x) => `<tr data-s="${esc([x.no_rumah, x.nama, x.uraian, x.catatan].join(' ').toLowerCase())}"><td>${tglS(x.tanggal)}</td><td>${x.no_rumah ? `<b>${esc(x.no_rumah)}</b>` : '<span class="tag">Gabungan</span>'}</td><td>${esc(x.nama || x.uraian || '—')}</td><td>${x.bulan.length ? fmtBulan(x.bulan) : '<span class="mut">—</span>'}</td><td class="nr"><b>${rp(x.total)}</b></td><td>${x.metode}</td><td class="mut wr">${esc(x.catatan || '')}</td>${aksi('iuran', x.id)}</tr>`).join('') || '<tr><td colspan="8" class="mut">Belum ada pembayaran.</td></tr>'}</tbody>
+ <tfoot><tr><td colspan="4">TOTAL</td><td class="nr">${rp(tot)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
+}
+
+// Pelaporan Iuran: ceklis otomatis dari pembayaran di Input Iuran.
+function kLapor() {
+  const K = S.K,
+    W = K.warga,
+    perBln = Array(12).fill(0);
+  const rows = W.map((w, i) => {
+    let uang = 0;
+    const cells = BL.map((_, j) => {
+      const n = lunas(w, j + 1);
+      if (n) {
+        perBln[j]++;
+        uang += n;
+      }
+      return `<td class="m">${n ? `<i class="ck i" title="${rp(n)}">✓</i>` : ''}</td>`;
+    });
+    return `<tr data-s="${esc((w.no_rumah + ' ' + (w.nama || '')).toLowerCase())}"><td class="no">${i + 1}</td><td class="st"><b>${esc(w.no_rumah)}</b><small>${esc(w.nama || '(kosong)')}</small></td>${cells.join('')}<td class="nr"><b>${rp(uang)}</b></td></tr>`;
+  });
+  return `<div class="card"><div class="ch"><div><h3 style="margin:0">Pelaporan Iuran Warga ${K.tahun}</h3><p class="sub">Tanda ✓ terisi otomatis dari pembayaran yang dicatat di Input Iuran.</p></div><button class="lk2" id="kasCsv">${I('dl')}Unduh CSV</button></div>
+ <div class="kbar">${cari('Cari rumah atau nama warga')}</div>
+ <div class="tw"><table class="kt grid12"><thead><tr><th class="no">NO</th><th class="st">RUMAH / NAMA</th>${BL.map((b) => `<th class="m">${b.toUpperCase()}</th>`).join('')}<th class="nr">TOTAL DIBAYAR</th></tr></thead><tbody>${rows.join('') || '<tr><td colspan="15" class="mut">Data Warga masih kosong.</td></tr>'}</tbody>
+ <tfoot><tr><td></td><td class="st">Rumah lunas</td>${perBln.map((n) => `<td class="m">${n}</td>`).join('')}<td class="nr">${W.length} rumah</td></tr></tfoot></table></div></div>`;
+}
+
+function kKeluar() {
+  const K = S.K,
+    L = K.pengeluaran.filter(
+      (x) => (!S.kasBl || +x.tanggal.slice(5, 7) === S.kasBl) && (!S.kasKat || x.kategori === S.kasKat),
+    ),
+    tot = L.reduce((a, x) => a + x.nominal, 0);
+  return `<div class="card"><div class="ch"><div><h3 style="margin:0">Pengeluaran Kas RT</h3><p class="sub">${L.length} pengeluaran di ${S.kasBl ? MON[S.kasBl - 1] + ' ' : ''}${K.tahun}${S.kasKat ? ' • ' + esc(S.kasKat) : ''}.</p></div><button class="lk2" id="kasCsv">${I('dl')}Unduh CSV</button></div>
+ <div class="kbar">${cari('Cari uraian, peruntukan, atau penerima')}${pilihBulan()}<select id="kkat" aria-label="Filter kategori"><option value="">Semua kategori</option>${K.kategori.map((k) => `<option${S.kasKat === k ? ' selected' : ''}>${k}</option>`).join('')}</select></div>
+ <div class="tw"><table class="kt"><thead><tr><th>TANGGAL</th><th>KATEGORI</th><th>PERUNTUKAN</th><th>URAIAN PENGELUARAN</th><th class="nr">NOMINAL</th><th>DIBAYARKAN KEPADA</th><th></th></tr></thead><tbody>
+ ${L.map((x) => `<tr data-s="${esc([x.kategori, x.peruntukan, x.uraian, x.dibayar_kepada].join(' ').toLowerCase())}"><td>${tglS(x.tanggal)}</td><td><span class="tag">${esc(x.kategori)}</span></td><td>${esc(x.peruntukan || '—')}</td><td>${esc(x.uraian)}</td><td class="nr dn"><b>${rp(x.nominal)}</b></td><td class="mut wr">${esc(x.dibayar_kepada || '')}</td>${aksi('keluar', x.id)}</tr>`).join('') || '<tr><td colspan="7" class="mut">Belum ada pengeluaran.</td></tr>'}</tbody>
+ <tfoot><tr><td colspan="4">TOTAL</td><td class="nr dn">${rp(tot)}</td><td colspan="2"></td></tr></tfoot></table></div></div>`;
+}
+
+function kWarga() {
+  const W = S.K.warga;
+  return `<div class="card"><div class="ch"><div><h3 style="margin:0">Data Warga</h3><p class="sub">${W.length} rumah. Data ini menjadi pilihan rumah saat mencatat iuran.</p></div><button class="lk2" id="kasCsv">${I('dl')}Unduh CSV</button></div>
+ <div class="kbar">${cari('Cari rumah, nama, atau keterangan')}</div>
+ <div class="tw"><table class="kt"><thead><tr><th class="no">NO</th><th>BLOK / NO. RUMAH</th><th>NAMA WARGA</th><th class="nr">NOMINAL IURAN</th><th>KETERANGAN</th><th></th></tr></thead><tbody>
+ ${W.map((w, i) => `<tr data-s="${esc([w.no_rumah, w.nama, w.keterangan].join(' ').toLowerCase())}"><td class="no">${i + 1}</td><td><b>${esc(w.no_rumah)}</b></td><td>${esc(w.nama || '—')}</td><td class="nr">${rp(w.nominal)}</td><td>${w.keterangan ? `<span class="tag ${w.keterangan === 'Rumah Kosong' ? '' : w.keterangan === 'Ada' ? 'g' : 'b'}">${esc(w.keterangan)}</span>` : ''}</td>${aksi('warga', w.id)}</tr>`).join('') || '<tr><td colspan="6" class="mut">Belum ada data rumah.</td></tr>'}</tbody></table></div></div>`;
+}
+
+function kBantu() {
+  const L = [
+    ['Data Warga', 'Isi blok/nomor rumah, nama, dan nominal iuran. Data ini menjadi pilihan saat mencatat iuran.'],
+    ['Input Iuran', 'Setiap pembayaran dicatat satu kali: pilih rumah, centang bulan yang dibayar, isi total dan metode. Untuk setoran gabungan (misalnya dari kolektor), pilih "Setoran gabungan" dan tulis uraiannya.'],
+    ['Pelaporan Iuran', 'Menampilkan ✓ otomatis pada bulan yang sudah dibayar di Input Iuran. Ganti tahun lewat pilihan "Tahun laporan" di kanan atas.'],
+    ['Pengeluaran', 'Catat biaya keamanan, sampah, listrik, kebersihan, kas sosial, acara, dan kebutuhan RT lainnya.'],
+    ['Rekap', 'Dihitung otomatis: pemasukan (total bayar menurut tanggal bayar), pengeluaran, selisih, dan saldo kumulatif per bulan, termasuk sisa kas tahun sebelumnya.'],
+  ];
+  return `<div class="card"><h3 style="margin:0">Petunjuk</h3><p class="sub">Cara memakai menu Kas Warga, sama dengan alur di file Excel laporan keuangan RT.</p><ol class="kbantu">${L.map(([t, d]) => `<li><b>${t}</b><span>${d}</span></li>`).join('')}</ol>
+ <div class="alr b">Satu bulan iuran hanya bisa dicatat sekali per rumah. Jika salah input, hapus pembayarannya di Input Iuran lalu catat ulang.</div></div>`;
+}
+
+// ----- Form (modal) -----
+function kasForm(judul, sub, isi, simpan, tombol = 'Simpan') {
+  const o = document.createElement('div');
+  o.className = 'mo';
+  o.innerHTML = `<form class="md kas" role="dialog" aria-modal="true" aria-label="${judul}" novalidate>
+ <div class="kh"><div><h3>${judul}</h3><p class="sub">${sub}</p></div><button type="button" class="x" id="kx" aria-label="Tutup">${I('x')}</button></div>
+ <div class="kb">${isi}<div class="err" id="ke" role="alert"></div></div>
+ <div class="kf"><button type="button" class="btn" id="kc">Batal</button><button class="btn p" id="ks">${tombol}</button></div></form>`;
+  const close = () => {
+    o.remove();
+    document.removeEventListener('keydown', ek);
+  };
+  const ek = (e) => e.key === 'Escape' && close();
+  document.addEventListener('keydown', ek);
+  document.body.append(o);
+  const q = (s) => o.querySelector(s);
+  // Jangan pakai "e.target === o && close()": handler onclick yang mengembalikan false membatalkan klik tombol Simpan.
+  o.onclick = (e) => {
+    if (e.target === o) close();
+  };
+  q('#kx').onclick = q('#kc').onclick = close;
+  q('form').onsubmit = async (e) => {
+    e.preventDefault();
+    q('#ke').textContent = '';
+    const b = q('#ks');
+    b.disabled = true;
+    try {
+      const ok = await simpan(q, (t) => (q('#ke').textContent = t));
+      if (ok !== false) {
+        close();
+        kasReload();
+      }
+    } catch (err) {
+      if (!err.handled) q('#ke').textContent = err.message;
+    }
+    b.disabled = false;
+  };
+  q('input, select')?.focus();
+  return q;
+}
+
+function iuranForm() {
+  const K = S.K,
+    y0 = K.tahun;
+  const opsi = K.warga
+    .map((w) => `<option value="${w.id}">${esc(w.no_rumah)}${w.nama ? ' — ' + esc(w.nama) : ''}</option>`)
+    .join('');
+  const q = kasForm(
+    'Catat Pembayaran Iuran',
+    'Bulan yang dicentang otomatis mendapat ceklis di Pelaporan Iuran.',
+    `<div class="g2"><div><label for="fd">Tanggal Bayar</label><input id="fd" type="date" value="${isoToday()}"></div><div><label for="fj">Jenis</label><select id="fj"><option value="r">Per rumah</option><option value="g">Setoran gabungan</option></select></div></div>
+ <div id="fr"><label for="fw">Blok / No. Rumah</label><select id="fw"><option value="">Pilih rumah…</option>${opsi}</select>
+ <label>Bulan yang dibayar <span class="mut" id="fy"></span></label><div class="g2 fyr"><select id="ft" aria-label="Tahun">${[y0 - 1, y0, y0 + 1].map((t) => `<option${t === y0 ? ' selected' : ''}>${t}</option>`).join('')}</select><span class="mut">Bisa sampai bulan di tahun berikutnya.</span></div><div id="fb"></div></div>
+ <div id="fgb" hidden><label for="fu">Uraian Setoran</label><input id="fu" maxlength="150" placeholder="Contoh: Iuran warga Agustus–Oktober (kolektor Blok A)"><div class="alr b">Setoran gabungan hanya menambah pemasukan kas dan tidak memberi ceklis di Pelaporan Iuran. Agar ceklis muncul, catat pembayaran per rumah.</div></div>
+ <div class="g2"><div><label for="fn">Total Bayar (Rp)</label><input id="fn" type="number" min="1" step="1" inputmode="numeric" placeholder="0"></div><div><label for="fm">Metode</label><select id="fm">${K.metode.map((m) => `<option>${m}</option>`).join('')}</select></div></div>
+ <label for="fc">Catatan</label><input id="fc" maxlength="255" placeholder="Opsional, contoh: Bulan Okt 26 – Mar 27">`,
+    async (q, E) => {
+      const g = q('#fj').value === 'g',
+        body = {
+          tanggal: q('#fd').value,
+          total: q('#fn').value,
+          metode: q('#fm').value,
+          catatan: q('#fc').value,
+        };
+      if (g) {
+        body.uraian = q('#fu').value.trim();
+        if (!body.uraian) return E('Uraian setoran wajib diisi.'), false;
+      } else {
+        body.warga_id = q('#fw').value;
+        body.bulan = [...q('#fb').querySelectorAll('input:checked')].map((c) => c.value.split('-').map(Number));
+        if (!body.warga_id) return E('Pilih rumah terlebih dahulu.'), false;
+        if (!body.bulan.length) return E('Centang minimal satu bulan yang dibayar.'), false;
+      }
+      if (!(+body.total > 0)) return E('Total bayar harus lebih dari 0.'), false;
+      await api('api/kas/iuran', body);
+      toast('Pembayaran iuran disimpan.');
+    },
   );
+  let manual = false;
+  const hitung = () => {
+    if (manual || q('#fj').value === 'g') return;
+    const w = wargaBy(+q('#fw').value),
+      n = q('#fb').querySelectorAll('input:checked').length;
+    q('#fn').value = w && n ? w.nominal * n : '';
+  };
+  const chips = () => {
+    const w = wargaBy(+q('#fw').value),
+      t0 = +q('#ft').value;
+    q('#fy').textContent = w ? '(' + rp(w.nominal) + ' / bulan)' : '';
+    q('#fb').innerHTML = [t0, t0 + 1]
+      .map(
+        (t) =>
+          `<div class="fbl"><small>${t}</small><div>${BL.map((b, j) => {
+            const sudah = w && t === K.tahun && lunas(w, j + 1);
+            return `<label class="chip ${sudah ? 'dis' : ''}" title="${sudah ? 'Sudah lunas' : ''}"><input type="checkbox" value="${t}-${j + 1}"${sudah ? ' disabled' : ''}>${b}</label>`;
+          }).join('')}</div></div>`,
+      )
+      .join('');
+    hitung();
+  };
+  q('#fw').onchange = q('#ft').onchange = () => {
+    manual = false;
+    chips();
+  };
+  q('#fb').onchange = hitung;
+  q('#fn').oninput = () => (manual = true);
+  q('#fj').onchange = () => {
+    const g = q('#fj').value === 'g';
+    q('#fr').hidden = g;
+    q('#fgb').hidden = !g;
+    if (!g) hitung();
+  };
+  chips();
+}
+
+function keluarForm(x) {
+  const K = S.K,
+    v = x || { tanggal: isoToday(), kategori: '', peruntukan: '', uraian: '', nominal: '', dibayar_kepada: '' };
+  kasForm(
+    x ? 'Ubah Pengeluaran' : 'Tambah Pengeluaran',
+    'Catat setiap pengeluaran kas RT pada satu baris.',
+    `<div class="g2"><div><label for="fd">Tanggal</label><input id="fd" type="date" value="${v.tanggal}"></div><div><label for="fk">Kategori</label><select id="fk"><option value="">Pilih kategori…</option>${K.kategori.map((k) => `<option${k === v.kategori ? ' selected' : ''}>${k}</option>`).join('')}</select></div></div>
+ <label for="fp">Peruntukan</label><input id="fp" maxlength="100" value="${esc(v.peruntukan || '')}" placeholder="Contoh: Gaji Satpam, Token Listrik">
+ <label for="fu">Uraian Pengeluaran</label><input id="fu" maxlength="200" value="${esc(v.uraian)}" placeholder="Contoh: Gaji keamanan bulan Mei">
+ <div class="g2"><div><label for="fn">Nominal (Rp)</label><input id="fn" type="number" min="1" step="1" inputmode="numeric" value="${v.nominal}" placeholder="0"></div><div><label for="fo">Dibayarkan Kepada</label><input id="fo" maxlength="100" value="${esc(v.dibayar_kepada || '')}" placeholder="Opsional"></div></div>`,
+    async (q, E) => {
+      const body = {
+        id: x?.id,
+        tanggal: q('#fd').value,
+        kategori: q('#fk').value,
+        peruntukan: q('#fp').value,
+        uraian: q('#fu').value.trim(),
+        nominal: q('#fn').value,
+        dibayar_kepada: q('#fo').value,
+      };
+      if (!body.tanggal) return E('Tanggal wajib diisi.'), false;
+      if (!body.kategori) return E('Pilih kategori pengeluaran.'), false;
+      if (!body.uraian) return E('Uraian pengeluaran wajib diisi.'), false;
+      if (!(+body.nominal > 0)) return E('Nominal harus lebih dari 0.'), false;
+      await api('api/kas/pengeluaran', body);
+      toast(x ? 'Pengeluaran diperbarui.' : 'Pengeluaran disimpan.');
+    },
+  );
+}
+
+function wargaForm(x) {
+  const K = S.K,
+    v = x || { no_rumah: '', nama: '', nominal: 30000, keterangan: 'Ada' };
+  kasForm(
+    x ? 'Ubah Data Rumah' : 'Tambah Rumah',
+    'Data ini menjadi pilihan rumah saat mencatat iuran.',
+    `<div class="g2"><div><label for="fr">Blok / No. Rumah</label><input id="fr" maxlength="40" value="${esc(v.no_rumah)}" placeholder="Contoh: A1 No. 05"></div><div><label for="fa">Nama Warga</label><input id="fa" maxlength="100" value="${esc(v.nama || '')}" placeholder="Kosongkan jika rumah kosong"></div></div>
+ <div class="g2"><div><label for="fn">Nominal Iuran / Bulan (Rp)</label><input id="fn" type="number" min="0" step="1000" inputmode="numeric" value="${v.nominal}"></div><div><label for="fk">Keterangan</label><select id="fk"><option value="">—</option>${K.keterangan.map((k) => `<option${k === v.keterangan ? ' selected' : ''}>${k}</option>`).join('')}</select></div></div>`,
+    async (q, E) => {
+      const body = {
+        id: x?.id,
+        no_rumah: q('#fr').value.trim(),
+        nama: q('#fa').value.trim(),
+        nominal: q('#fn').value,
+        keterangan: q('#fk').value,
+      };
+      if (!body.no_rumah) return E('Blok / No. Rumah wajib diisi.'), false;
+      if (!(+body.nominal >= 0) || body.nominal === '') return E('Nominal iuran tidak valid.'), false;
+      await api('api/kas/warga', body);
+      toast(x ? 'Data rumah diperbarui.' : 'Rumah ditambahkan.');
+    },
+  );
+}
+
+function kasHapus(t, id) {
+  const K = S.K,
+    d = {
+      iuran: () => {
+        const x = K.iuran.find((r) => r.id === id);
+        return ['pembayaran', `${esc(x.no_rumah ? x.no_rumah + ' ' + (x.nama || '') : x.uraian)} sebesar <b>${rp(x.total)}</b>${x.bulan.length ? ' (' + fmtBulan(x.bulan) + ')' : ''}`, x.bulan.length ? ' Ceklis bulan tersebut di Pelaporan Iuran ikut terhapus.' : ''];
+      },
+      keluar: () => {
+        const x = K.pengeluaran.find((r) => r.id === id);
+        return ['pengeluaran', `${esc(x.uraian)} sebesar <b>${rp(x.nominal)}</b>`];
+      },
+      warga: () => {
+        const x = K.warga.find((r) => r.id === id);
+        return ['rumah', `<b>${esc(x.no_rumah)}</b> ${esc(x.nama || '')}`];
+      },
+    }[t](),
+    url = { iuran: 'api/kas/iuran/hapus', keluar: 'api/kas/pengeluaran/hapus', warga: 'api/kas/warga/hapus' }[t];
+  modal(
+    'Hapus ' + d[0],
+    `<p>Hapus ${d[0]} ${d[1]}?${d[2] || ''} Tindakan ini tidak dapat dibatalkan.</p><div class="rt" style="gap:10px"><button class="btn" id="dn">Batal</button><button class="btn p" id="dy">Hapus</button></div>`,
+  );
+  $('#dn').onclick = closeM;
+  $('#dy').onclick = async () => {
+    try {
+      await api(url, { id });
+      closeM();
+      toast('Data dihapus.');
+      kasReload();
+    } catch (e) {
+      closeM();
+      fail(e);
+    }
+  };
+}
+
+function kasCsv() {
+  const K = S.K,
+    th = K.tahun;
+  let rows, nama;
+  if (S.kasTab === 'rekap') {
+    let s = K.saldo_awal;
+    rows = [['Bulan', 'Pemasukan Iuran', 'Pengeluaran', 'Selisih Bulanan', 'Saldo Kumulatif']].concat(
+      K.rekap.map((r) => [MON[r.bulan - 1], r.masuk, r.keluar, r.masuk - r.keluar, (s += r.masuk - r.keluar)]),
+    );
+    nama = 'rekap';
+  } else if (S.kasTab === 'iuran') {
+    rows = [['Tanggal Bayar', 'Blok / No. Rumah', 'Nama Warga', 'Bulan Dibayar', 'Total Bayar', 'Metode', 'Catatan']].concat(
+      K.iuran.map((x) => [x.tanggal, x.no_rumah || '', x.nama || x.uraian || '', fmtBulan(x.bulan), x.total, x.metode, x.catatan || '']),
+    );
+    nama = 'input-iuran';
+  } else if (S.kasTab === 'lapor') {
+    rows = [['No', 'Blok / No. Rumah', 'Nama Warga', ...BL]].concat(
+      K.warga.map((w, i) => [i + 1, w.no_rumah, w.nama || '', ...BL.map((_, j) => (lunas(w, j + 1) ? '✓' : ''))]),
+    );
+    nama = 'pelaporan-iuran';
+  } else if (S.kasTab === 'keluar') {
+    rows = [['Tanggal', 'Kategori', 'Peruntukan', 'Uraian Pengeluaran', 'Nominal', 'Dibayarkan Kepada']].concat(
+      K.pengeluaran.map((x) => [x.tanggal, x.kategori, x.peruntukan || '', x.uraian, x.nominal, x.dibayar_kepada || '']),
+    );
+    nama = 'pengeluaran';
+  } else {
+    rows = [['No', 'Blok / No. Rumah', 'Nama Warga', 'Nominal Iuran', 'Keterangan']].concat(
+      K.warga.map((w, i) => [i + 1, w.no_rumah, w.nama || '', w.nominal, w.keterangan || '']),
+    );
+    nama = 'data-warga';
+  }
+  const sel = (v) => (/[",;\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(
-    new Blob(['\ufeff' + rows.map((r) => r.join(',')).join('\n')], {
-      type: 'text/csv;charset=utf-8',
-    }),
+    new Blob(['﻿' + rows.map((r) => r.map(sel).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }),
   );
-  a.download = 'rekap-kas-warga.csv';
+  a.download = `kas-${nama}-${th}.csv`;
   document.body.append(a);
   a.click();
   a.remove();
-  toast('Rekap diunduh.');
 }
-function kasModal() {
-  const o = document.createElement('div');
-  o.className = 'mo';
-  o.innerHTML = `<form class="md kas" role="dialog" aria-modal="true" aria-label="Tambah Transaksi Kas" novalidate>
- <div class="kh"><div><h3>Tambah Transaksi Kas</h3><p class="sub">Catat pemasukan atau pengeluaran kas warga.</p></div><button type="button" class="x" id="kx" aria-label="Tutup">${I('x')}</button></div>
- <div class="kb"><div class="g2"><div><label for="kj">Jenis Transaksi</label><select id="kj"><option value="masuk">Pemasukan</option><option value="keluar">Pengeluaran</option></select></div><div><label for="kd">Tanggal</label><input id="kd" type="date" value="${isoToday()}"></div></div>
- <label for="kk">Keterangan</label><input id="kk" placeholder="Contoh: Iuran warga bulan Mei">
- <div class="g2"><div><label for="kt">Kategori</label><select id="kt"></select></div><div><label for="kn">Nominal (Rp)</label><input id="kn" type="number" min="1" step="1" inputmode="numeric" placeholder="0"></div></div>
- <div class="alr b">Pastikan jenis transaksi dan nominal sudah sesuai sebelum menyimpan catatan kas.</div><div class="err" id="ke" role="alert"></div></div>
- <div class="kf"><button type="button" class="btn" id="kc">Batal</button><button class="btn p">Simpan Transaksi</button></div></form>`;
-  const close = () => {
-    o.remove();
-    document.removeEventListener('keydown', esc2);
-  };
-  const esc2 = (e) => e.key === 'Escape' && close();
-  document.addEventListener('keydown', esc2);
-  document.body.append(o);
-  const q = (s) => o.querySelector(s),
-    fill = () => (q('#kt').innerHTML = KAT.map((k) => `<option>${k}</option>`).join(''));
-  fill();
-  o.onclick = (e) => e.target === o && close();
-  q('#kx').onclick = q('#kc').onclick = close;
-  q('form').onsubmit = (e) => {
-    e.preventDefault();
-    const j = q('#kj').value,
-      d = q('#kd').value,
-      k = q('#kk').value.trim(),
-      n = Math.round(+q('#kn').value),
-      E = (t) => (q('#ke').textContent = t);
-    if (!d) return E('Tanggal wajib diisi.');
-    if (!k) return E('Keterangan wajib diisi.');
-    if (!(n > 0)) return E('Nominal harus lebih dari 0.');
-    if (j === 'keluar' && n > saldoNow())
-      return E('Nominal pengeluaran melebihi saldo kas (' + rp(saldoNow()) + ').');
-    S.kas.unshift({ tgl: d, jenis: j, ket: k, kat: q('#kt').value, nom: n });
-    S.kasUpd = today();
-    close();
-    toast('Transaksi kas disimpan.');
+
+function bindKas() {
+  const r = $('#kasRetry');
+  if (r) r.onclick = kasReload;
+  const th = $('#kth');
+  if (!th) return;
+  th.onchange = () => {
+    S.kasTh = +th.value;
+    S.K = null;
     app();
   };
-  q('#kk').focus();
-}
-function bindKas() {
-  const add = $('#kasAdd');
-  if (!add) return;
-  add.onclick = kasModal;
-  $('#kasDl').onclick = unduhRekap;
   document.querySelectorAll('[data-kt]').forEach(
     (b) =>
       (b.onclick = () => {
         S.kasTab = b.dataset.kt;
+        S.kasBl = 0;
+        S.kasKat = '';
         app();
+      }),
+  );
+  const add = $('#kasAdd');
+  if (add) add.onclick = { iuran: iuranForm, keluar: () => keluarForm(), warga: () => wargaForm() }[S.kasTab];
+  const csv = $('#kasCsv');
+  if (csv) csv.onclick = kasCsv;
+  const kq = $('#kq');
+  if (kq)
+    kq.oninput = () => {
+      const s = kq.value.trim().toLowerCase();
+      document.querySelectorAll('tr[data-s]').forEach((tr) => (tr.hidden = !!s && !tr.dataset.s.includes(s)));
+    };
+  const kbl = $('#kbl');
+  if (kbl)
+    kbl.onchange = () => {
+      S.kasBl = +kbl.value;
+      app();
+    };
+  const kkat = $('#kkat');
+  if (kkat)
+    kkat.onchange = () => {
+      S.kasKat = kkat.value;
+      app();
+    };
+  document.querySelectorAll('[data-ke]').forEach(
+    (b) =>
+      (b.onclick = () => {
+        const [t, id] = b.dataset.ke.split(':');
+        if (t === 'keluar') keluarForm(S.K.pengeluaran.find((x) => x.id === +id));
+        else wargaForm(S.K.warga.find((x) => x.id === +id));
+      }),
+  );
+  document.querySelectorAll('[data-kh]').forEach(
+    (b) =>
+      (b.onclick = () => {
+        const [t, id] = b.dataset.kh.split(':');
+        kasHapus(t, +id);
       }),
   );
 }

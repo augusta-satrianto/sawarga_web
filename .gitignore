@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# File laporan keuangan berisi data warga, jangan ikut di-commit
+*.xlsx
+*.xls

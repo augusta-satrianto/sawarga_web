@@ -1577,3 +1577,274 @@ td.dn {
   cursor: pointer;
   align-self: flex-start;
 }
+/* ---------- Kas Warga (tab mengikuti sheet Excel laporan keuangan) ---------- */
+.kh2 {
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.kth {
+  margin: 0;
+  font-size: 12px;
+  color: var(--mut);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kth select {
+  padding: 10px 12px;
+  min-width: 110px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.ktabs {
+  gap: 22px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ktabs .tb {
+  white-space: nowrap;
+}
+.card .ch .lk2 {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.kbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 4px 0 14px;
+}
+.kbar select {
+  width: auto;
+  padding: 10px 12px;
+}
+.kc strong {
+  font-size: 26px;
+  white-space: nowrap;
+}
+.kq {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+.kq svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--mut);
+}
+.kq input {
+  padding: 10px 12px 10px 36px;
+}
+table.kt th,
+table.kt td {
+  padding: 11px 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+table.kt th {
+  font-size: 11px;
+}
+table.kt td:nth-child(4) {
+  white-space: normal;
+  min-width: 160px;
+}
+table.kt td.wr {
+  white-space: normal;
+  min-width: 140px;
+  font-size: 13px;
+}
+table.kt .nr {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+table.kt .no {
+  color: var(--mut);
+  width: 44px;
+}
+table.kt tbody tr:hover td {
+  background: var(--bg);
+}
+table.kt tfoot td {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--bg);
+}
+table.kt tr.sa td {
+  color: var(--mut);
+  background: var(--bg);
+}
+table.kt tr:last-child td {
+  border-bottom: 1px solid var(--line);
+}
+.mut {
+  color: var(--mut);
+}
+.ka {
+  text-align: right;
+  width: 1%;
+}
+.ib {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--mut);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  margin-left: 6px;
+}
+.ib svg {
+  width: 15px;
+  height: 15px;
+}
+.ib:hover {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+.ib.r:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+/* Grid ceklis bulanan (Pelaporan Iuran / Data Iuran Warga) */
+table.grid12 {
+  min-width: 900px;
+}
+table.grid12 .m {
+  text-align: center;
+  padding: 8px 4px;
+  width: 46px;
+}
+table.grid12 td:nth-child(4) {
+  min-width: 0;
+}
+table.grid12 .st {
+  position: sticky;
+  left: 0;
+  background: var(--card);
+  z-index: 1;
+  min-width: 190px;
+  border-right: 1px solid var(--line);
+}
+table.grid12 th.st {
+  z-index: 2;
+}
+table.grid12 tfoot .st {
+  background: var(--bg);
+}
+table.grid12 td.st b,
+table.grid12 td.st small {
+  display: block;
+}
+table.grid12 td.st small {
+  color: var(--mut);
+  font-size: 12px;
+  font-weight: 400;
+}
+.ck {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+}
+.ck.i {
+  background: var(--okS);
+  color: var(--ok);
+}
+/* Form pilih bulan */
+.fyr {
+  align-items: center;
+}
+.fbl {
+  margin-top: 10px;
+}
+.fbl small {
+  display: block;
+  color: var(--mut);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.fbl div {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.chip {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 0;
+  text-align: center;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: auto;
+}
+.chip:has(input:checked) {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.chip:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+.chip.dis {
+  background: var(--okS);
+  border-color: transparent;
+  color: var(--ok);
+  cursor: not-allowed;
+}
+.kbantu {
+  margin: 16px 0;
+  padding-left: 20px;
+}
+.kbantu li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.kbantu li b,
+.kbantu li span {
+  display: block;
+}
+.kbantu li span {
+  color: var(--mut);
+  font-size: 14px;
+  margin-top: 2px;
+}
+@media (max-width: 640px) {
+  .kh2 {
+    width: 100%;
+  }
+  .kh2 .btn {
+    flex: 1;
+  }
+  .fbl div {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  table.grid12 .no {
+    display: none;
+  }
+  table.grid12 .st {
+    min-width: 140px;
+    max-width: 160px;
+    white-space: normal;
+  }
+}

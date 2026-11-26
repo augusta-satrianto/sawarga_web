@@ -3,6 +3,10 @@
 namespace Database\Seeders;
 
 use App\Http\Controllers\SuratController;
+use App\Models\KasIuran;
+use App\Models\KasIuranBulan;
+use App\Models\KasPengeluaran;
+use App\Models\KasWarga;
 use App\Models\Surat;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -107,6 +111,86 @@ class DatabaseSeeder extends Seeder
         });
 
         $this->command->info('Surat contoh dibuat: ' . count($surat) . ' (masing-masing 2 dokumen)');
+
+        $this->kasContoh($akun['ketua.rt']->id);
+    }
+
+    // Data kas contoh (nama fiktif). Data asli diimpor dari Excel: php artisan sawarga:impor-kas "file.xlsx" --hapus
+    private function kasContoh(int $rtId): void
+    {
+        $th = (int) now()->year;
+        $rumah = [
+            ['A1 No. 01', 'Bpk Andi Wijaya', 30000, 'Ada'],
+            ['A1 No. 02', 'Ibu Rina Kurnia', 30000, 'Ada'],
+            ['A1 No. 03', 'Bpk Hendra Saputra', 30000, 'Visit'],
+            ['A2 No. 01', 'Bpk Joko Prasetyo', 30000, 'Ada'],
+            ['A2 No. 02', null, 30000, 'Rumah Kosong'],
+            ['B1 No. 05', 'Ibu Lina Marlina', 20000, 'Ada'],
+            ['B1 No. 06', 'Bpk Rudi Hartono', 30000, 'Pengurus'],
+            ['C1 No. 01', 'Toko Berkah', 50000, 'Ruko'],
+        ];
+
+        DB::transaction(function () use ($th, $rumah, $rtId) {
+            $w = [];
+            foreach ($rumah as [$no, $nama, $nominal, $ket]) {
+                $w[] = KasWarga::create(['no_rumah' => $no, 'nama' => $nama, 'nominal_iuran' => $nominal, 'keterangan' => $ket]);
+            }
+
+            // [rumah, tanggal bayar (bulan-hari), bulan yang dibayar, metode, catatan]
+            $bayar = [
+                [0, '01-05', [1, 2, 3], 'Transfer', 'Bulan Jan - Mar'],
+                [1, '01-10', [1], 'Tunai', null],
+                [3, '01-12', [1, 2, 3, 4, 5, 6], 'Transfer', 'Bulan Jan - Jun'],
+                [5, '02-03', [1, 2], 'Tunai', null],
+                [1, '02-08', [2], 'Tunai', null],
+                [7, '02-15', [1, 2, 3], 'Transfer', null],
+                [0, '04-04', [4, 5, 6], 'Transfer', 'Bulan Apr - Jun'],
+                [1, '03-09', [3], 'Tunai', null],
+                [2, '03-20', [1, 2, 3], 'Tunai', null],
+                [6, '03-21', [1, 2, 3, 4], 'Tunai', null],
+            ];
+            foreach ($bayar as [$i, $tgl, $bulan, $metode, $catatan]) {
+                $iuran = KasIuran::create([
+                    'tanggal' => "$th-$tgl",
+                    'kas_warga_id' => $w[$i]->id,
+                    'total' => $w[$i]->nominal_iuran * count($bulan),
+                    'metode' => $metode,
+                    'catatan' => $catatan,
+                    'dicatat_oleh' => $rtId,
+                ]);
+                foreach ($bulan as $b) {
+                    KasIuranBulan::create([
+                        'kas_iuran_id' => $iuran->id, 'kas_warga_id' => $w[$i]->id,
+                        'tahun' => $th, 'bulan' => $b, 'nominal' => $w[$i]->nominal_iuran,
+                    ]);
+                }
+            }
+            KasIuran::create([
+                'tanggal' => "$th-01-31", 'uraian' => 'Setoran iuran tunai Blok A-C Januari-Maret (kolektor)',
+                'total' => 3200000, 'metode' => 'Tunai', 'dicatat_oleh' => $rtId,
+            ]);
+
+            // [tanggal, kategori, peruntukan, uraian, nominal, dibayar kepada]
+            $keluar = [
+                ['01-07', 'Keamanan', 'Gaji Satpam', 'Gaji keamanan Januari', 750000, 'Petugas keamanan'],
+                ['01-15', 'Sampah', null, 'Retribusi sampah DLHK', 375000, 'DLHK'],
+                ['01-20', 'Listrik/Fasilitas', 'Token Listrik', 'Token listrik pos satpam', 50000, null],
+                ['02-07', 'Keamanan', 'Gaji Satpam', 'Gaji keamanan Februari', 750000, 'Petugas keamanan'],
+                ['02-11', 'Kas Sosial', 'Dana Sosial Warga Sakit', 'Menjenguk warga sakit', 100000, null],
+                ['02-15', 'Sampah', null, 'Retribusi sampah DLHK', 375000, 'DLHK'],
+                ['03-02', 'Acara Warga', 'Rapat Rutin', 'Konsumsi rapat warga', 120000, null],
+                ['03-07', 'Keamanan', 'Gaji Satpam', 'Gaji keamanan Maret', 750000, 'Petugas keamanan'],
+                ['03-25', 'Administrasi', 'Honor Pengurus', 'Honor RT', 200000, 'Ketua RT'],
+            ];
+            foreach ($keluar as [$tgl, $kat, $per, $uraian, $nominal, $kepada]) {
+                KasPengeluaran::create([
+                    'tanggal' => "$th-$tgl", 'kategori' => $kat, 'peruntukan' => $per, 'uraian' => $uraian,
+                    'nominal' => $nominal, 'dibayar_kepada' => $kepada, 'dicatat_oleh' => $rtId,
+                ]);
+            }
+        });
+
+        $this->command->info('Kas contoh dibuat: ' . count($rumah) . ' rumah');
     }
 
     // PDF kecil sebagai pengganti dokumen KTP/KK asli.
