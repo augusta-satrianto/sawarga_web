@@ -1307,25 +1307,10 @@ dd {
 .ttd u {
   font-weight: 600;
 }
-/* Tanda tangan elektronik (QR code) */
-.ttd .qr {
+/* Ruang kosong untuk tanda tangan basah (QR tanda tangan elektronik dinonaktifkan sementara) */
+.ttd-kosong {
   display: block;
-  margin: 10px 0 6px;
-}
-.ttd .qr img {
-  display: block;
-  width: 96px;
-  height: 96px;
-}
-.ttd .qr-kosong {
-  display: block;
-  height: 54px;
-}
-.ttd .qr-ket {
-  margin-top: 6px;
-  font-size: 10px;
-  line-height: 1.4;
-  color: #64748b;
+  height: 80px;
 }
 .tl .it {
   display: flex;

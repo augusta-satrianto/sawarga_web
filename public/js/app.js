@@ -844,7 +844,7 @@ function previewPage(l) {
  <p>Yang bertanda tangan di bawah ini, Ketua RT 24 RW 03 Kelurahan Sukamaju, menerangkan bahwa:</p>
  <dl class="sd">${rows.map(([k, v]) => `<dt>${k}</dt><dd>: ${esc(v)}</dd>`).join('')}</dl>
  <p>${usaha ? 'Benar merupakan warga kami dan memiliki usaha sebagaimana tersebut di atas.' : 'Benar merupakan warga kami dan berdomisili di wilayah RT 24 RW 03 sebagaimana tersebut di atas.'} Surat ini dibuat untuk digunakan sebagaimana mestinya.</p>
- <div class="ttd"><span>Bandung, ${l.tglVer || l.tgl}<br>Ketua RT 24</span>${l.qr ? `<a class="qr" href="${esc(l.urlVer)}" target="_blank" rel="noopener" title="Verifikasi keaslian surat"><img src="${esc(l.qr)}" alt="QR tanda tangan elektronik"></a>` : '<i class="qr-kosong"></i>'}<u>${esc(l.penandatangan || 'Ketua RT 24')}</u>${l.qr ? '<small class="qr-ket">Ditandatangani secara elektronik.<br>Pindai QR untuk memeriksa keaslian surat.</small>' : ''}</div></div></div></div>`;
+ <div class="ttd"><span>Bandung, ${l.tglVer || l.tgl}<br>Ketua RT 24</span><i class="ttd-kosong"></i><u>${esc(l.penandatangan || 'Ketua RT 24')}</u></div></div></div></div>`;
 }
 function suratDetail(l) {
   const wait = /Menunggu/.test(l.s),

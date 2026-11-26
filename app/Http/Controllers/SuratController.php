@@ -199,7 +199,8 @@ class SuratController extends Controller
         ]);
     }
 
-    // GET /api/surat/{id}/pdf - unduh surat yang sudah disetujui sebagai file PDF (dengan QR tanda tangan).
+    // GET /api/surat/{id}/pdf - unduh surat yang sudah disetujui sebagai file PDF.
+    // Tanda tangan dibiarkan kosong (QR tanda tangan elektronik dinonaktifkan sementara).
     public function pdf(Request $request, int $id): Response
     {
         $user = $request->user();
@@ -216,13 +217,10 @@ class SuratController extends Controller
         $urut = substr((string) $surat->no_pengajuan, strrpos((string) $surat->no_pengajuan, '-') + 1);
         $nomor = $urut . '/RT24/' . $romawi[$surat->created_at->month - 1] . '/' . $surat->created_at->year;
 
-        $qr = VerifikasiController::qrSvg(route('verifikasi', $surat->kode_verifikasi));
-
         $pdf = Pdf::loadView('surat-pdf', [
             'surat' => $surat,
             'nomor' => $nomor,
             'tanggal' => ($surat->diverifikasi_pada ?? $surat->created_at)->translatedFormat('d F Y'),
-            'qr' => 'data:image/svg+xml;base64,' . base64_encode($qr),
         ])->setPaper('a4')->setOption('isFontSubsettingEnabled', true);
 
         $nama = str_replace(' ', '_', $surat->jenis) . '_' . $surat->no_pengajuan . '.pdf';

@@ -18,9 +18,9 @@
         table.data td.k { width: 110px; color: #64748b; font-size: 10pt; }
         /* Blok tanda tangan di sisi kanan, isinya rata tengah. */
         .ttd { margin-top: 30px; margin-left: auto; width: 240px; text-align: center; }
-        .ttd img { width: 92px; height: 92px; margin: 8px 0 4px; }
+        /* Ruang kosong untuk tanda tangan basah (QR tanda tangan elektronik dinonaktifkan sementara). */
+        .ttd .kosong { height: 70px; }
         .ttd u { font-weight: bold; }
-        .ttd .ket { margin-top: 6px; font-size: 7.5pt; line-height: 1.4; color: #64748b; }
     </style>
 </head>
 <body>
@@ -56,9 +56,8 @@
     <div class="ttd">
         Bandung, {{ $tanggal }}<br>
         Ketua RT 24<br>
-        <img src="{{ $qr }}" alt="QR tanda tangan elektronik"><br>
+        <div class="kosong"></div>
         <u>{{ $surat->verifikator?->nama ?? 'Ketua RT 24' }}</u>
-        <div class="ket">Ditandatangani secara elektronik.<br>Pindai QR untuk memeriksa keaslian surat.</div>
     </div>
 </body>
 </html>

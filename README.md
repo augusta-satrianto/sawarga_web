@@ -108,6 +108,11 @@ setelahnya.
 
 ## Tanda tangan elektronik (QR code)
 
+> **Sementara dinonaktifkan di tampilan.** Pratinjau surat dan PDF unduhan menampilkan ruang tanda
+> tangan kosong (untuk tanda tangan basah). Kode verifikasi dan halaman `/verifikasi/{kode}` di backend
+> tetap berjalan, jadi QR bisa dipasang lagi di `public/js/app.js` (fungsi `previewPage`),
+> `resources/views/surat-pdf.blade.php`, dan `SuratController::pdf()`.
+
 Saat pengurus RT menekan **Setujui Pengajuan** (status `Siap Diunduh`), surat otomatis mendapat
 `kode_verifikasi` unik. Di bagian tanda tangan surat muncul QR code + nama pengurus yang menyetujui.
 QR berisi alamat `/verifikasi/{kode}`, halaman publik (tanpa login) yang menampilkan apakah surat sah,
